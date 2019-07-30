@@ -1,0 +1,158 @@
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+import helper as hlp
+
+'''
+# For Validation set
+if is_valid:
+  valid_batch = int(num_pts / 3.0)
+  np.random.seed(45689)
+  rnd_idx = np.arange(num_pts)
+  np.random.shuffle(rnd_idx)
+  val_data = data[rnd_idx[:valid_batch]]
+  data = data[rnd_idx[valid_batch:]]
+
+
+def log_GaussPDF(X, mu, sigma):
+    # Inputs
+    # X: N X D
+    # mu: K X D
+    # sigma: K X 1
+    # log_pi: K X 1
+
+    # Outputs:
+    # log Gaussian PDF N X K
+
+    # TODO
+
+def log_posterior(log_PDF, log_pi):
+    # Input
+    # log_PDF: log Gaussian PDF N X K
+    # log_pi: K X 1
+
+    # Outputs
+    # log_post: N X K
+
+    # TODO
+'''
+
+#--------------------------Code for part 2.2.2---------------------------
+tf.set_random_seed(45689)
+np.random.seed(45689)
+input_data = np.load('data2D.npy') 
+#input_data = np.load('data100D.npy')  #For part 3
+sess = tf.InteractiveSession()
+data_num, data_dim = np.shape(input_data)[0], np.shape(input_data)[1]
+randIndx = np.arange(len(input_data))
+np.random.shuffle(randIndx)
+
+#Since the problem requires us to hold 1/3 for validation
+#Meaning 2/3 will be used for testing
+size = int(10000*(2/3))
+input_data = input_data[randIndx]
+trainData = input_data[:10000]  
+validData = input_data[10000:]
+K=5
+alpha=0.1
+
+#Distance function for GMM
+def distanceFunc(X, MU):
+    X_new = tf.expand_dims(X, 1)
+    return tf.reduce_sum(tf.square(X_new - MU), 2)
+    
+#Gaussian PDF
+def Gaussian_PDF(X,mu,sigma):
+    Dims = tf.shape(X)[1]
+    pi = tf.constant(3.14159265359,tf.float64)
+    distance = distanceFunc(X,mu)
+    first_term = tf.cast(-Dims,tf.float64)/2.*tf.log(2.*pi*sigma**2)
+    second_term = tf.div(-distance,2.*tf.square(sigma))
+    log_gauss = first_term + second_term
+    assignment = tf.arg_max(log_gauss, 1)
+    return log_gauss, assignment
+
+
+def Joint_prob(X,mu,prior,sigma):
+    log_gauss, assignment = Gaussian_PDF(X,mu,sigma)
+    posterior = log_gauss+prior
+    return posterior, assignment
+
+def reduce_logsumexp(input_tensor, reduction_indices=1, keep_dims=False):
+
+    max_input_tensor1 = tf.reduce_max(input_tensor, reduction_indices, keep_dims=keep_dims)
+    max_input_tensor2 = max_input_tensor1
+    if not keep_dims:
+      max_input_tensor2 = tf.expand_dims(max_input_tensor2, 
+                                       reduction_indices) 
+    return tf.log(tf.reduce_sum(tf.exp(input_tensor - max_input_tensor2), 
+                                reduction_indices, keep_dims=keep_dims)) + max_input_tensor1
+
+def logsoftmax(input_tensor):
+  return input_tensor - reduce_logsumexp(input_tensor, keep_dims=True)
+
+def log_prob(x,mean,prior,sigma):
+   return logsoftmax(Joint_prob(x,mean,prior,sigma)) 
+  
+
+data = tf.placeholder(tf.float64, [None,data_dim], name='input_x')   
+mean =  tf.cast(tf.Variable(tf.random_normal([K, data_dim])),tf.float64)
+sigma = tf.cast(tf.Variable(tf.random_normal([K,])),tf.float64)
+sigma_exp = tf.exp(sigma)
+prior = tf.cast(tf.Variable(tf.random_normal([1,K])),tf.float64)
+prior_softmax = logsoftmax(prior)
+    
+#define the graph
+log_post, assignment = Joint_prob(data,mean,prior_softmax,sigma_exp)
+marginprob = reduce_logsumexp(log_post,keep_dims = True)
+loss_f =-1* tf.reduce_sum (marginprob)
+
+#Adam Optimizer training
+optimizer = tf.train.AdamOptimizer(learning_rate=alpha,beta1=0.99,beta2=0.999,epsilon=1e-5)
+train = optimizer.minimize(loss_f)
+train,data,mean,loss_f, assignment,sigma_exp,prior_softmax
+    
+
+error_train = []
+# Build computation graph
+train,data,mean,loss, assignment ,sigma_exp,prior_softmax
+
+# Initialize session and training the model
+init = tf.initialize_all_variables()
+sess.run(init)
+for i in range(1000):
+    _, error, center, assignSize,si,pri= sess.run([train, loss, mean, assignment,sigma_exp,prior_softmax], feed_dict={data:trainData})
+    error_train.append(error/10000)
+    print('iteration:',i,'loss:',error/10000)
+    #print('mean:',center)
+    
+#plt.plot(train_err)
+color = np.int32(assignSize)
+#print('class:', assign)
+x = input_data[:, 0]
+y = input_data[:, 1]
+
+
+#Plot vs number of updates
+
+#print('mean:', center)
+#print('prior:', np.exp(pri))
+#print('sigma:', si)
+
+#Loss vs number of iterations: 
+'''
+plt.figure(figsize=(10,10))
+plt.grid()
+plt.figure(2)
+plt.scatter(np.arange(0, len(error_train)), error_train, marker='o', color='r',)
+plt.xlabel("Iterations")
+plt.ylabel("Loss")
+plt.show()
+'''
+
+#Scatter plots
+plt.title('Scatter: K = ' + str(K))
+plt.style.use('ggplot')
+plt.scatter(x,y,c=color)
+plt.grid()
+plt.show()
