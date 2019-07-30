@@ -1,2 +1,2 @@
-# Machine-Learning-Labs-Projects
-ECE421 Assignments
+# ECE421 Assignment 1
+Linear and Logistic Regression
